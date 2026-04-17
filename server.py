@@ -3,6 +3,8 @@ import websockets
 import json
 import os
 from datetime import datetime
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+import threading
 
 users = {}
 
@@ -48,11 +50,20 @@ async def broadcast(msg):
 async def broadcast_users_list():
     await broadcast({"type": "users_list", "users": list(users.keys())})
 
-async def main():
+async def start_websocket():
     port = int(os.environ.get("PORT", 8765))
     async with websockets.serve(handler, "0.0.0.0", port):
-        print(f"✅ Сервер запущен на порту {port}")
+        print(f"✅ WebSocket сервер на порту {port}")
         await asyncio.Future()
 
+def start_http():
+    port = int(os.environ.get("PORT", 8000))
+    with HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler) as httpd:
+        print(f"✅ HTTP сервер на порту {port}")
+        httpd.serve_forever()
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Запускаем HTTP сервер в отдельном потоке
+    threading.Thread(target=start_http, daemon=True).start()
+    # Запускаем WebSocket сервер
+    asyncio.run(start_websocket())
