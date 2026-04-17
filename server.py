@@ -33,8 +33,8 @@ async def handler(ws):
                 target = data.get("to")
                 if target and target in users:
                     await users[target].send(json.dumps({"type": "typing", "from": username}))
-    except Exception as e:
-        print(f"Ошибка: {e}")
+    except:
+        pass
     finally:
         if username and username in users:
             del users[username]
@@ -50,8 +50,8 @@ async def broadcast_users_list():
 
 async def main():
     port = int(os.environ.get("PORT", 10000))
-    print(f"✅ Сервер запущен на порту {port}")
     async with websockets.serve(handler, "0.0.0.0", port):
+        print(f"✅ WebSocket сервер запущен на порту {port}")
         await asyncio.Future()
 
 if __name__ == "__main__":
