@@ -3,19 +3,8 @@ import websockets
 import json
 import os
 from datetime import datetime
-from http.server import HTTPServer, SimpleHTTPRequestHandler
-import threading
-import socket
 
 users = {}
-
-def find_free_port():
-    """Находит свободный порт"""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', 0))
-        s.listen(1)
-        port = s.getsockname()[1]
-        return port
 
 async def handler(ws):
     username = None
@@ -59,23 +48,11 @@ async def broadcast(msg):
 async def broadcast_users_list():
     await broadcast({"type": "users_list", "users": list(users.keys())})
 
-def start_http():
-    """Запускает HTTP сервер для отдачи HTML"""
-    port = find_free_port()
-    print(f"📁 HTTP сервер на порту {port}")
-    with HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler) as httpd:
-        httpd.serve_forever()
-
-async def start_websocket():
-    ws_port = int(os.environ.get("PORT", 10000))
-    async with websockets.serve(handler, "0.0.0.0", ws_port):
-        print(f"💬 WebSocket сервер на порту {ws_port}")
+async def main():
+    port = int(os.environ.get("PORT", 10000))
+    print(f"✅ Сервер запущен на порту {port}")
+    async with websockets.serve(handler, "0.0.0.0", port):
         await asyncio.Future()
 
 if __name__ == "__main__":
-    print("🚀 Запуск мессенджера...")
-    # Запускаем HTTP сервер в фоне
-    http_thread = threading.Thread(target=start_http, daemon=True)
-    http_thread.start()
-    # Запускаем WebSocket сервер
-    asyncio.run(start_websocket())
+    asyncio.run(main())
