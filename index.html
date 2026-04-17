@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Семейный мессенджер</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #0e1621;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .app {
+            width: 100%;
+            max-width: 1200px;
+            height: 90vh;
+            background: #17212b;
+            border-radius: 12px;
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .sidebar {
+            width: 280px;
+            background: #17212b;
+            border-right: 1px solid #242f3d;
+            display: flex;
+            flex-direction: column;
+        }
+        .user-info {
+            padding: 20px;
+            background: #1f2a36;
+            border-bottom: 1px solid #242f3d;
+        }
+        .user-name {
+            color: white;
+            font-weight: bold;
+            font-size: 18px;
+        }
+        .online-status {
+            color: #6abf4b;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+        .chats-header {
+            padding: 15px;
+            color: #7e8c9e;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .users-list {
+            flex: 1;
+            overflow-y: auto;
+        }
+        .user-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: background 0.2s;
+            border-bottom: 1px solid #242f3d;
+        }
+        .user-item:hover { background: #1f2a36; }
+        .user-item.active { background: #2b5270; }
+        .user-name-small { color: white; font-size: 14px; }
+        .user-status { color: #7e8c9e; font-size: 11px; margin-top: 3px; }
+        .user-status.online { color: #6abf4b; }
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #0e1621;
+        }
+        .chat-header {
+            padding: 15px 20px;
+            background: #17212b;
+            border-bottom: 1px solid #242f3d;
+            color: white;
+            font-weight: bold;
+        }
+        .messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        .message {
+            max-width: 65%;
+            padding: 8px 12px;
+            border-radius: 12px;
+            word-wrap: break-word;
+        }
+        .message.other {
+            background: #17212b;
+            align-self: flex-start;
+            color: white;
+        }
+        .message.self {
+            background: #2b5270;
+            align-self: flex-end;
+            color: white;
+        }
+        .message-info {
+            font-size: 11px;
+            color: #7e8c9e;
+            margin-top: 4px;
+        }
+        .typing-indicator {
+            padding: 10px 20px;
+            color: #7e8c9e;
+            font-size: 12px;
+            font-style: italic;
+        }
+        .input-area {
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            background: #17212b;
+            border-top: 1px solid #242f3d;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 10px 15px;
+            background: #242f3d;
+            border: none;
+            border-radius: 20px;
+            color: white;
+            font-size: 14px;
+            outline: none;
+        }
+        .input-area input::placeholder { color: #7e8c9e; }
+        .input-area button {
+            background: #2b5270;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            cursor: pointer;
+        }
+        @media (max-width: 700px) {
+            .sidebar { width: 80px; }
+            .user-name-small, .user-status, .chats-header { display: none; }
+            .user-item { text-align: center; padding: 15px 0; }
+        }
+    </style>
+</head>
+<body>
+<div class="app">
+    <div class="sidebar">
+        <div class="user-info">
+            <div class="user-name" id="myName">Загрузка...</div>
+            <div class="online-status">● Онлайн</div>
+        </div>
+        <div class="chats-header">Чаты</div>
+        <div class="users-list" id="usersList"></div>
+    </div>
+    <div class="chat-area">
+        <div class="chat-header" id="chatHeader">Общий чат</div>
+        <div class="messages" id="messages"></div>
+        <div class="typing-indicator" id="typingIndicator" style="display: none;"></div>
+        <div class="input-area">
+            <input type="text" id="messageInput" placeholder="Сообщение..." autocomplete="off">
+            <button onclick="sendMessage()">📤</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    let ws;
+    let myName = localStorage.getItem("messengerName");
+    if (!myName) {
+        myName = prompt("Введите ваше имя:", "Пользователь");
+        if (myName) localStorage.setItem("messengerName", myName);
+        else myName = "Гость";
+    }
+    document.getElementById("myName").innerText = myName;
+    
+    let currentChat = "all";
+    let typingTimeout = null;
+    
+    function connect() {
+        let wsUrl = "wss://" + window.location.hostname;
+        ws = new WebSocket(wsUrl);
+        
+        ws.onopen = () => {
+            ws.send(JSON.stringify({type: "register", username: myName}));
+        };
+        
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            if (data.type === "users_list") {
+                updateUsersList(data.users);
+            } else if (data.type === "public" && (currentChat === "all" || currentChat === data.from)) {
+                addMessage(data.from, data.text, false, data.time);
+            } else if (data.type === "private" && (currentChat === data.from || currentChat === myName)) {
+                addMessage(data.from, data.text, false, data.time);
+            } else if (data.type === "typing" && currentChat === data.from) {
+                showTyping(data.from);
+            } else if (data.type === "info") {
+                addInfo(data.text);
+            }
+        };
+        
+        ws.onclose = () => {
+            addInfo("❌ Потеря связи. Переподключение...");
+            setTimeout(connect, 3000);
+        };
+    }
+    
+    function updateUsersList(users) {
+        const container = document.getElementById("usersList");
+        container.innerHTML = '<div style="padding: 12px 20px; color: #7e8c9e; cursor: pointer;" onclick="selectChat(\'all\')">📢 Общий чат</div>';
+        users.filter(u => u !== myName).forEach(user => {
+            const div = document.createElement("div");
+            div.className = "user-item" + (currentChat === user ? " active" : "");
+            div.onclick = () => selectChat(user);
+            div.innerHTML = `<div class="user-name-small">${escapeHtml(user)}</div><div class="user-status online">● онлайн</div>`;
+            container.appendChild(div);
+        });
+    }
+    
+    function selectChat(chat) {
+        currentChat = chat;
+        document.getElementById("chatHeader").innerHTML = chat === "all" ? "📢 Общий чат" : `💬 ${chat}`;
+        document.getElementById("messages").innerHTML = "";
+        document.querySelectorAll(".user-item").forEach(el => el.classList.remove("active"));
+    }
+    
+    function addMessage(from, text, isSelf, time) {
+        const messagesDiv = document.getElementById("messages");
+        const msgDiv = document.createElement("div");
+        msgDiv.className = "message " + (isSelf || from === myName ? "self" : "other");
+        msgDiv.innerHTML = `<div>${!isSelf && from !== myName ? `<b>${escapeHtml(from)}</b><br>` : ""}${escapeHtml(text)}</div><div class="message-info">${time || ""}</div>`;
+        messagesDiv.appendChild(msgDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function addInfo(text) {
+        const messagesDiv = document.getElementById("messages");
+        const infoDiv = document.createElement("div");
+        infoDiv.style.cssText = "text-align: center; color: #7e8c9e; font-size: 12px; margin: 5px 0;";
+        infoDiv.innerText = text;
+        messagesDiv.appendChild(infoDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+    
+    function showTyping(from) {
+        const indicator = document.getElementById("typingIndicator");
+        indicator.innerText = `${from} печатает...`;
+        indicator.style.display = "block";
+        if (typingTimeout) clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => indicator.style.display = "none", 2000);
+    }
+    
+    function sendMessage() {
+        const input = document.getElementById("messageInput");
+        const text = input.value.trim();
+        if (!text || !ws) return;
+        if (currentChat === "all") {
+            ws.send(JSON.stringify({type: "public", text: text}));
+        } else {
+            ws.send(JSON.stringify({type: "private", to: currentChat, text: text}));
+        }
+        addMessage(myName, text, true, new Date().toLocaleTimeString());
+        input.value = "";
+    }
+    
+    function sendTyping() {
+        if (currentChat !== "all" && ws) {
+            ws.send(JSON.stringify({type: "typing", to: currentChat}));
+        }
+    }
+    
+    document.getElementById("messageInput").addEventListener("input", () => sendTyping());
+    document.getElementById("messageInput").addEventListener("keypress", (e) => { if (e.key === "Enter") sendMessage(); });
+    
+    function escapeHtml(str) {
+        return str.replace(/[&<>]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+    }
+    
+    connect();
+</script>
+</body>
+</html>
