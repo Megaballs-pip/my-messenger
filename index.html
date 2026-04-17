@@ -183,7 +183,7 @@
     let typingTimeout = null;
     
     function connect() {
-        let wsUrl = "wss://" + window.location.hostname;
+        let wsUrl = "wss://" + window.location.host;
         ws = new WebSocket(wsUrl);
         
         ws.onopen = () => {
