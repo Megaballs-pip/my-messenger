@@ -182,16 +182,23 @@
     let currentChat = "all";
     let typingTimeout = null;
     
+    // ⚠️ ЗАМЕНИТЕ ВАШ_АДРЕС на реальный адрес вашего WebSocket сервера из Render
+    // Пример: const WS_URL = "wss://my-messenger.onrender.com";
+    const WS_URL = "wss://ВАШ_АДРЕС.onrender.com";
+    
     function connect() {
-        let wsUrl = "wss://" + window.location.host;
-        ws = new WebSocket(wsUrl);
+        console.log("Подключение к " + WS_URL);
+        ws = new WebSocket(WS_URL);
         
         ws.onopen = () => {
+            console.log("WebSocket открыт");
             ws.send(JSON.stringify({type: "register", username: myName}));
         };
         
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
+            console.log("Получено:", data);
+            
             if (data.type === "users_list") {
                 updateUsersList(data.users);
             } else if (data.type === "public" && (currentChat === "all" || currentChat === data.from)) {
@@ -206,8 +213,14 @@
         };
         
         ws.onclose = () => {
-            addInfo("❌ Потеря связи. Переподключение...");
+            console.log("WebSocket закрыт");
+            addInfo("❌ Потеря связи. Переподключение через 3 секунды...");
             setTimeout(connect, 3000);
+        };
+        
+        ws.onerror = (error) => {
+            console.log("Ошибка WebSocket:", error);
+            addInfo("❌ Ошибка соединения");
         };
     }
     
@@ -259,7 +272,10 @@
     function sendMessage() {
         const input = document.getElementById("messageInput");
         const text = input.value.trim();
-        if (!text || !ws) return;
+        if (!text || !ws || ws.readyState !== WebSocket.OPEN) {
+            addInfo("❌ Нет соединения с сервером");
+            return;
+        }
         if (currentChat === "all") {
             ws.send(JSON.stringify({type: "public", text: text}));
         } else {
@@ -270,7 +286,7 @@
     }
     
     function sendTyping() {
-        if (currentChat !== "all" && ws) {
+        if (currentChat !== "all" && ws && ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({type: "typing", to: currentChat}));
         }
     }
