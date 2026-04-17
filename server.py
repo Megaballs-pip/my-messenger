@@ -1,6 +1,7 @@
 import asyncio
 import websockets
 import json
+import os
 from datetime import datetime
 
 users = {}
@@ -48,8 +49,9 @@ async def broadcast_users_list():
     await broadcast({"type": "users_list", "users": list(users.keys())})
 
 async def main():
-    async with websockets.serve(handler, "0.0.0.0", 8765):
-        print("✅ Сервер запущен")
+    port = int(os.environ.get("PORT", 8765))
+    async with websockets.serve(handler, "0.0.0.0", port):
+        print(f"✅ Сервер запущен на порту {port}")
         await asyncio.Future()
 
 if __name__ == "__main__":
