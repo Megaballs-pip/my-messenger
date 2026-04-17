@@ -35,8 +35,8 @@ async def handler(ws):
                 target = data.get("to")
                 if target and target in users:
                     await users[target].send(json.dumps({"type": "typing", "from": username}))
-    except:
-        pass
+    except Exception as e:
+        print(f"Ошибка: {e}")
     finally:
         if username and username in users:
             del users[username]
@@ -51,19 +51,11 @@ async def broadcast_users_list():
     await broadcast({"type": "users_list", "users": list(users.keys())})
 
 async def start_websocket():
-    port = int(os.environ.get("PORT", 8765))
+    port = int(os.environ.get("PORT", 10000))
     async with websockets.serve(handler, "0.0.0.0", port):
-        print(f"✅ WebSocket сервер на порту {port}")
+        print(f"✅ WebSocket сервер запущен на порту {port}")
         await asyncio.Future()
 
-def start_http():
-    port = int(os.environ.get("PORT", 8000))
-    with HTTPServer(("0.0.0.0", port), SimpleHTTPRequestHandler) as httpd:
-        print(f"✅ HTTP сервер на порту {port}")
-        httpd.serve_forever()
-
 if __name__ == "__main__":
-    # Запускаем HTTP сервер в отдельном потоке
-    threading.Thread(target=start_http, daemon=True).start()
-    # Запускаем WebSocket сервер
+    print("🚀 Запуск WebSocket сервера...")
     asyncio.run(start_websocket())
